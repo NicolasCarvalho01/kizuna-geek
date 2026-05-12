@@ -1,0 +1,410 @@
+@import "tailwindcss";
+
+/* =====================================================================
+   KIZUNA GEEK — Design System
+   Estética: editorial japonês · wabi-sabi · Ma 間 · boutique
+   Princípios: monocromia quente + ouro como acento cirúrgico
+   ===================================================================== */
+
+@theme inline {
+  /* -------- PALETA OBRIGATÓRIA -------- */
+  --color-cream: #e8e2d6;          /* texto sobre dark · soft light */
+  --color-cream-fog: #fafaf7;      /* background light principal */
+  --color-cream-deep: #ddd6c6;     /* cards/divisores no tema light */
+  --color-cream-mute: #ede6d8;     /* hover/skeleton */
+
+  --color-gold: #b59458;           /* dourado canônico — CTAs, badges premium */
+  --color-gold-soft: #c9a874;      /* hover */
+  --color-gold-deep: #8e7038;      /* active/pressed */
+  --color-gold-ink: #5a4622;       /* texto sobre fundo dourado */
+
+  --color-navy: #1a1b3a;           /* navy obrigatório — dark bg */
+  --color-navy-deep: #0f1027;      /* dark hero / footer */
+  --color-navy-fog: #25264a;       /* cards/elevações no dark */
+  --color-navy-mute: #2f3056;      /* borders/skeleton no dark */
+
+  --color-ink: #0e0e10;            /* texto principal no tema light */
+  --color-ink-soft: #4a4b5e;       /* texto secundário no tema light */
+  --color-ink-mute: #7a7b8e;       /* texto terciário/disabled */
+
+  --color-vermilion: #c8463e;      /* acento secundário muito raro (torii red) — só em estados de erro/destaque crítico */
+  --color-moss: #5e6b4f;           /* acento terciário discreto */
+
+  /* -------- TOKENS SEMÂNTICOS (resolvidos por tema mais abaixo) -------- */
+  --color-bg: var(--color-cream-fog);
+  --color-bg-elevated: #ffffff;
+  --color-bg-sunken: var(--color-cream-mute);
+  --color-fg: var(--color-ink);
+  --color-fg-soft: var(--color-ink-soft);
+  --color-fg-mute: var(--color-ink-mute);
+  --color-border: rgba(14, 14, 16, 0.10);
+  --color-border-strong: rgba(14, 14, 16, 0.22);
+  --color-hairline: rgba(14, 14, 16, 0.06);
+
+  /* -------- TIPOGRAFIA -------- */
+  --font-display: var(--font-cormorant), "Cormorant Garamond", "Times New Roman", serif;
+  --font-body: var(--font-geist), "Geist", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --font-jp: var(--font-noto-jp), "Noto Serif JP", "Hiragino Mincho Pro", serif;
+
+  /* -------- TIPO ESCALA EDITORIAL -------- */
+  --text-eyebrow: 0.6875rem;       /* 11px — micro-labels */
+  --text-caption: 0.8125rem;       /* 13px — legendas */
+  --text-body: 1rem;
+  --text-lead: 1.125rem;
+  --text-h6: 1.25rem;
+  --text-h5: 1.5rem;
+  --text-h4: 1.875rem;
+  --text-h3: 2.5rem;
+  --text-h2: 3.5rem;
+  --text-h1: 5rem;
+  --text-display: clamp(3.75rem, 9vw, 9rem);
+
+  --leading-tight: 0.95;
+  --leading-snug: 1.1;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  --tracking-tight: -0.025em;
+  --tracking-snug: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-eyebrow: 0.18em;     /* uppercase eyebrows */
+
+  /* -------- ESPAÇAMENTO -------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+  --space-11: 12rem;
+  --space-12: 16rem;
+
+  /* -------- GRID SYSTEM -------- */
+  --wrap-width: min(1440px, calc(100% - 24px * 2));
+  --wrap-width-narrow: min(960px, calc(100% - 24px * 2));
+  --wrap-pad-x: 1.5rem;
+  --wrap-pad-x-lg: 2.5rem;
+
+  /* -------- BORDERS / RADII -------- */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* -------- SOMBRAS (quentes, nunca cinza puro) -------- */
+  --shadow-1: 0 1px 2px rgba(74, 56, 28, 0.06), 0 0 0 1px rgba(74, 56, 28, 0.04);
+  --shadow-2: 0 6px 16px -4px rgba(74, 56, 28, 0.10), 0 2px 4px rgba(74, 56, 28, 0.05);
+  --shadow-3: 0 16px 40px -12px rgba(74, 56, 28, 0.16), 0 4px 8px rgba(74, 56, 28, 0.06);
+  --shadow-4: 0 32px 80px -16px rgba(74, 56, 28, 0.20), 0 8px 16px rgba(74, 56, 28, 0.08);
+  --shadow-gold: 0 0 0 1px var(--color-gold), 0 8px 24px -8px rgba(181, 148, 88, 0.45);
+
+  /* -------- EASINGS (Robert Penner — adotado do Opal) -------- */
+  --ease-out-1: cubic-bezier(0.39, 0.575, 0.565, 1);
+  --ease-out-2: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out-3: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-out-4: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-5: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-6: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-1: cubic-bezier(0.47, 0, 0.745, 0.715);
+  --ease-in-2: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+  --ease-in-3: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --ease-io-1: cubic-bezier(0.445, 0.05, 0.55, 0.95);
+  --ease-io-3: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-io-4: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-io-5: cubic-bezier(0.86, 0, 0.07, 1);
+  --ease-io-6: cubic-bezier(1, 0, 0, 1);
+
+  /* -------- DURAÇÕES -------- */
+  --motion-fast: 180ms;
+  --motion-base: 280ms;
+  --motion-slow: 520ms;
+  --motion-slowest: 980ms;
+}
+
+/* =====================================================================
+   TEMA DARK — sobrescreve tokens semânticos quando `.dark` no <html>
+   ===================================================================== */
+.dark {
+  --color-bg: var(--color-navy);
+  --color-bg-elevated: var(--color-navy-fog);
+  --color-bg-sunken: var(--color-navy-deep);
+  --color-fg: var(--color-cream);
+  --color-fg-soft: rgba(232, 226, 214, 0.72);
+  --color-fg-mute: rgba(232, 226, 214, 0.48);
+  --color-border: rgba(232, 226, 214, 0.10);
+  --color-border-strong: rgba(232, 226, 214, 0.22);
+  --color-hairline: rgba(232, 226, 214, 0.06);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(232, 226, 214, 0.04);
+  --shadow-2: 0 6px 16px -4px rgba(0, 0, 0, 0.50), 0 2px 4px rgba(0, 0, 0, 0.30);
+  --shadow-3: 0 16px 40px -12px rgba(0, 0, 0, 0.60), 0 4px 8px rgba(0, 0, 0, 0.30);
+  --shadow-4: 0 32px 80px -16px rgba(0, 0, 0, 0.70), 0 8px 16px rgba(0, 0, 0, 0.40);
+  --shadow-gold: 0 0 0 1px var(--color-gold), 0 8px 32px -6px rgba(181, 148, 88, 0.55);
+}
+
+/* =====================================================================
+   BASE
+   ===================================================================== */
+*,
+*::before,
+*::after {
+  border-color: var(--color-border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  color-scheme: light;
+  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-snug);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  min-height: 100svh;
+  transition:
+    background-color var(--motion-slow) var(--ease-out-3),
+    color var(--motion-slow) var(--ease-out-3);
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-gold-ink);
+}
+
+/* Focus ring estilizado (acessibilidade) */
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* =====================================================================
+   UTILITÁRIOS CUSTOMIZADOS
+   ===================================================================== */
+
+/* Container editorial central */
+.wrap {
+  width: var(--wrap-width);
+  margin-inline: auto;
+}
+
+.wrap-narrow {
+  width: var(--wrap-width-narrow);
+  margin-inline: auto;
+}
+
+/* Eyebrow — micro-label uppercase em ouro */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+  color: var(--color-gold);
+}
+
+/* Hairline — divisor sutilíssimo */
+.hairline {
+  height: 1px;
+  background: var(--color-hairline);
+}
+
+/* Texto vertical kana — tagline japonesa girada 90° */
+.vertical-jp {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-family: var(--font-jp);
+  letter-spacing: 0.4em;
+  line-height: 1.2;
+}
+
+/* Display serif balanceado pra blocos editoriais */
+.display {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.display-italic {
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Grain overlay sutil — textura "papel" no light, "noite" no dark */
+.grain {
+  position: relative;
+  isolation: isolate;
+}
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.04 0 0 0 0 0.06 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.dark .grain::after {
+  mix-blend-mode: screen;
+  opacity: 0.35;
+}
+
+/* =====================================================================
+   ANIMAÇÕES BASE
+   ===================================================================== */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes draw-stroke {
+  from {
+    stroke-dashoffset: var(--stroke-length, 1000);
+    opacity: 0;
+  }
+  20% { opacity: 1; }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes shimmer-gold {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+/* =====================================================================
+   KANJI BRUSH — animação caligráfica do 絆 no hero
+   ===================================================================== */
+
+/* Cada pincelada começa invisível e "desenha" da origem até o fim.
+   Sem filter:blur per-frame — manter a animação leve e a pincelada crisp.
+   Combinada com `pathLength="1"` no SVG, o cálculo da extensão é trivial. */
+@keyframes brush-draw {
+  from {
+    stroke-dashoffset: 1;
+    opacity: 0.85;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes brush-bloom {
+  0%   { opacity: 0; transform: scale(0.88); }
+  55%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0.8; transform: scale(1); }
+}
+
+.kanji-stroke {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  /* GPU hint — promove a animação pra layer compositada (sem repaint do SVG inteiro) */
+  will-change: stroke-dashoffset, opacity;
+  /* Timing snappy: 380ms por traço × 100ms stagger × 11 traços + 130ms delay ≈ 1.5s total.
+     `ease-out-4` (0.165,0.84,0.44,1) acelera no início — feeling de pincel confiante. */
+  animation: brush-draw calc(380ms / var(--kanji-speed, 1)) var(--ease-out-4) forwards;
+  animation-delay: calc(var(--idx, 0) * (100ms / var(--kanji-speed, 1)) + 130ms);
+}
+
+.kanji-halo {
+  opacity: 0;
+  transform-origin: 54.5px 54.5px;
+  /* Halo entra junto com a finalização do último traço (overlap intencional) */
+  animation: brush-bloom calc(900ms / var(--kanji-speed, 1)) var(--ease-out-4) forwards;
+  animation-delay: calc(10 * (100ms / var(--kanji-speed, 1)) + 130ms + 200ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanji-stroke {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    filter: none;
+    animation: none;
+  }
+  .kanji-halo {
+    opacity: 0.8;
+    animation: none;
+  }
+}
+
+/* Stagger helper — aplicar via inline style --i */
+.reveal {
+  opacity: 0;
+  animation: fade-up var(--motion-slow) var(--ease-out-5) forwards;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+.reveal-fade {
+  opacity: 0;
+  animation: fade-in var(--motion-slow) var(--ease-out-3) forwards;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

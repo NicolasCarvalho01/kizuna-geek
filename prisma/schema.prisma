@@ -1,0 +1,863 @@
+// ============================================================
+// KIZUNA GEEK — Prisma Schema
+// E-commerce de Action Figures, Colecionáveis e TCG
+// Fundação production-ready: tipagem forte, índices certos,
+// snapshots históricos imutáveis em pedidos e NF-e.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum CategoryType {
+  ACTION_FIGURE
+  TCG
+  COLLECTIBLE
+  OTHER
+}
+
+enum ProductType {
+  ACTION_FIGURE
+  TCG_SINGLE
+  TCG_SEALED
+  COLLECTIBLE
+  OTHER
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum TcgLanguage {
+  PT
+  EN
+  JP
+  ES
+  KR
+  CN
+  FR
+  DE
+  IT
+}
+
+enum TcgCondition {
+  MINT
+  NEAR_MINT
+  LIGHTLY_PLAYED
+  MODERATELY_PLAYED
+  HEAVILY_PLAYED
+  DAMAGED
+}
+
+enum FigureBoxCondition {
+  MINT
+  GOOD
+  FAIR
+  DAMAGED
+  NO_BOX
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  AWAITING_RELEASE
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum MeShipmentStatus {
+  PENDING
+  RELEASED
+  POSTED
+  DELIVERED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  STRIPE
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  PIX
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum InvoiceStatus {
+  PENDING
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  CANCELLED
+  ERROR
+}
+
+// ============================================================
+// 1. AUTENTICAÇÃO E USUÁRIOS
+// ============================================================
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  image          String?
+  /// CPF apenas dígitos — único quando preenchido, opcional para guests/OAuth.
+  cpf            String?   @unique
+  phone          String?
+  birthDate      DateTime?
+  /// Hash bcrypt — usuários OAuth puro permanecem com null.
+  passwordHash   String?
+  role           UserRole  @default(CUSTOMER)
+  /// LGPD: consentimento explícito do usuário para receber comunicações de marketing.
+  marketingOptIn Boolean   @default(false)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  /// Soft delete — preserva integridade referencial em pedidos e reviews históricos.
+  deletedAt      DateTime?
+
+  accounts            Account[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  addresses           Address[]
+  orders              Order[]
+  reviews             Review[]
+  wishlistItems       WishlistItem[]
+  cart                Cart?
+  shippingQuotes      ShippingQuote[]
+
+  @@index([role])
+  @@index([deletedAt])
+  @@index([createdAt])
+}
+
+/// Auth.js v5 — formato exigido por `@auth/prisma-adapter`.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+/// Auth.js v5 — formato exigido por `@auth/prisma-adapter`.
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+/// Auth.js v5 — tokens de verificação de e-mail e magic link.
+/// Mantém o formato exato esperado pelo adapter (sem id sintético, PK composta).
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  /// Token aleatório enviado por e-mail (hash, não o valor original).
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  /// Null = ainda válido; preenchido após consumo (single-use).
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Address {
+  id            String   @id @default(cuid())
+  userId        String
+  /// Apelido pessoal escolhido pelo usuário (ex: "Casa", "Trabalho").
+  label         String
+  recipientName String
+  /// CEP apenas dígitos, sem máscara (8 chars).
+  zipCode       String
+  street        String
+  number        String
+  complement    String?
+  neighborhood  String
+  city          String
+  /// UF — 2 letras maiúsculas (validar na aplicação).
+  state         String
+  country       String   @default("BR")
+  /// Endereço default do usuário. Apenas um por user — invariante mantido na aplicação.
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([zipCode])
+}
+
+// ============================================================
+// 2. CATÁLOGO
+// ============================================================
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  imageUrl    String?
+  /// Auto-relação para subcategorias (ex: "TCG" → "Pokémon").
+  parentId    String?
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  /// Determina quais atributos de variante são relevantes (TCG, figura, etc.).
+  type        CategoryType
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  /// Soft delete — mantém histórico em pedidos.
+  deletedAt   DateTime?
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@index([parentId])
+  @@index([slug])
+  @@index([isActive])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+model Product {
+  id               String        @id @default(cuid())
+  slug             String        @unique
+  /// SKU "pai" do produto. Cada variante tem o próprio SKU.
+  sku              String        @unique
+  name             String
+  shortDescription String?
+  /// Descrição longa em MDX/HTML — renderizada na página do produto.
+  description      String?       @db.Text
+  categoryId       String
+  /// Define o shape dos atributos da variante (TCG vs figura vs colecionável).
+  productType      ProductType
+  brand            String?
+  /// Franquia/IP — usado em filtros e SEO (ex: "Pokémon", "One Piece").
+  franchise        String?
+  /// Preço base. Variante pode sobrescrever via priceOverride.
+  basePrice        Decimal       @db.Decimal(10, 2)
+  /// Preço "de" — usado para mostrar desconto. Null = sem desconto exibido.
+  compareAtPrice   Decimal?      @db.Decimal(10, 2)
+  /// Custo de aquisição — visível APENAS para admin/staff. Nunca exposto na API pública.
+  cost             Decimal?      @db.Decimal(10, 2)
+  /// Peso do produto em GRAMAS — usado pelo Melhor Envio para cotar frete.
+  weight           Int
+  /// Dimensões em centímetros: { length, width, height }. Usado no cálculo do frete.
+  dimensions       Json
+  status           ProductStatus @default(DRAFT)
+  featured         Boolean       @default(false)
+  /// Pré-venda: produto ainda não lançado, aceita pedidos com data prevista.
+  isPreOrder       Boolean       @default(false)
+  /// Data prevista de lançamento — exibida na vitrine de pré-venda.
+  releaseDate      DateTime?
+  /// Encerramento da janela de pré-venda (após essa data o flag isPreOrder é virado off).
+  preOrderEndsAt   DateTime?
+  metaTitle        String?
+  metaDescription  String?
+  viewCount        Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  /// Soft delete — pedidos e reviews mantêm referência via snapshot.
+  deletedAt        DateTime?
+
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images        ProductImage[]
+  variants      ProductVariant[]
+  tags          ProductTag[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([franchise])
+  @@index([status])
+  @@index([featured])
+  @@index([isPreOrder])
+  @@index([productType])
+  @@index([brand])
+  @@index([deletedAt])
+  @@index([createdAt])
+}
+
+model ProductVariant {
+  id                String   @id @default(cuid())
+  productId         String
+  /// SKU único da variante (não do produto pai).
+  sku               String   @unique
+  /// Rótulo legível para o usuário — gerado a partir dos atributos ou customizado.
+  name              String
+  /// Preço específico da variante. Null = usa basePrice do Product.
+  priceOverride     Decimal? @db.Decimal(10, 2)
+  stock             Int      @default(0)
+  /// Abaixo desse limite o painel admin exibe alerta de estoque baixo.
+  lowStockThreshold Int      @default(5)
+  isActive          Boolean  @default(true)
+  /// Imagem específica desta variante (ex: foto da carta foil vs não-foil).
+  imageUrl          String?
+
+  // -------- TCG (preenchidos quando productType ∈ {TCG_SINGLE, TCG_SEALED}) --------
+  tcgLanguage   TcgLanguage?
+  tcgCondition  TcgCondition?
+  /// Edição/set (ex: "Base Set", "Scarlet & Violet 151", "Alpha").
+  tcgEdition    String?
+  /// Raridade impressa na carta (ex: "Common", "Holo Rare", "Secret Rare").
+  tcgRarity     String?
+  tcgIsFoil     Boolean?
+  /// Numeração da carta no set (ex: "025/198").
+  tcgCardNumber String?
+
+  // -------- Action Figures / Colecionáveis --------
+  /// True = com caixa original; false = loose.
+  figureHasBox       Boolean?
+  figureBoxCondition FigureBoxCondition?
+  /// Escala (ex: "1/7", "1/8", "S.H. Figuarts").
+  figureScale        String?
+  /// Fabricante (ex: "Good Smile Company", "MegaHouse", "Bandai").
+  figureManufacturer String?
+
+  /// Extensibilidade: atributos futuros não previstos no schema rígido.
+  /// Útil para campos sazonais ou específicos de novos tipos de produto.
+  attributes Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@index([isActive])
+  @@index([stock])
+  @@index([tcgLanguage, tcgCondition])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  /// Imagem destacada — usada como thumbnail em listagens.
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([productId, sortOrder])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products ProductTag[]
+}
+
+/// Tabela explícita de N:N entre Product e Tag — guarda `createdAt` para timeline.
+model ProductTag {
+  productId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+}
+
+// ============================================================
+// 3. CARRINHO
+// ============================================================
+
+model Cart {
+  id        String    @id @default(cuid())
+  /// Null para guests. Único quando preenchido — um cart ativo por usuário.
+  userId    String?   @unique
+  /// ID de sessão (cookie) para carts de guests.
+  sessionId String?   @unique
+  /// Expiração: 30 dias para guests, sem expiração para usuários logados.
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items          CartItem[]
+  shippingQuotes ShippingQuote[]
+
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+
+model CartItem {
+  id               String   @id @default(cuid())
+  cartId           String
+  productVariantId String
+  quantity         Int
+  /// Preço no momento da adição — usado para detectar mudanças de preço e avisar o cliente.
+  priceSnapshot    Decimal  @db.Decimal(10, 2)
+  /// Sinaliza que este item é pré-venda — UI destaca prazo de lançamento.
+  isPreOrder       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  cart           Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, productVariantId])
+  @@index([productVariantId])
+}
+
+// ============================================================
+// 4. PEDIDOS E PAGAMENTOS
+// ============================================================
+
+model Order {
+  id          String      @id @default(cuid())
+  /// Número visível ao cliente: `KZN-YYYYMMDD-XXXXX` (gerado na aplicação).
+  orderNumber String      @unique
+  /// Null para guests — o e-mail fica em guestEmail.
+  userId      String?
+  /// E-mail do guest (para envio de NF-e e tracking sem conta).
+  guestEmail  String?
+  status      OrderStatus @default(PENDING)
+
+  // ---- Pré-venda ----
+  /// True se pelo menos um item do pedido é pré-venda. Acelera queries.
+  hasPreOrderItems Boolean   @default(false)
+  /// Data prevista de envio — pega o `releaseDate` mais distante entre os itens em pré-venda.
+  expectedShipDate DateTime?
+
+  // ---- Totais (Decimal — NUNCA Float em valores monetários) ----
+  subtotal       Decimal @db.Decimal(10, 2)
+  shippingCost   Decimal @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+
+  couponId String?
+
+  // ---- Envio (Melhor Envio) ----
+  /// Nome amigável do serviço (ex: "PAC", "SEDEX", "Jadlog .Package").
+  shippingService   String
+  /// ID do serviço dentro do Melhor Envio (ex: 1 = PAC, 2 = SEDEX).
+  shippingServiceId Int
+  /// Transportadora (ex: "Correios", "Jadlog", "Loggi", "Azul Cargo").
+  shippingCarrier   String
+  /// ID do envio no carrinho do ME (antes da compra da etiqueta).
+  meShipmentId      String?
+  /// ID do pedido no ME após a compra da etiqueta.
+  meOrderId         String?           @unique
+  meTrackingUrl     String?
+  meLabelUrl        String?
+  meStatus          MeShipmentStatus?
+
+  trackingCode          String?
+  estimatedDeliveryDate DateTime?
+
+  // ---- Snapshot do endereço de entrega (campos copiados, NÃO FK) ----
+  /// Snapshot imutável — preserva o endereço exato usado, mesmo se o cadastro mudar depois.
+  shippingRecipientName String
+  shippingZipCode       String
+  shippingStreet        String
+  shippingNumber        String
+  shippingComplement    String?
+  shippingNeighborhood  String
+  shippingCity          String
+  shippingState         String
+  shippingCountry       String  @default("BR")
+
+  customerNotes String?
+  /// Anotações internas — visíveis apenas para admin/staff.
+  internalNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  coupon        Coupon?              @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items         OrderItem[]
+  payment       Payment?
+  invoice       Invoice?
+  statusHistory OrderStatusHistory[]
+  webhookEvents MeWebhookEvent[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([createdAt])
+  @@index([hasPreOrderItems])
+  @@index([meOrderId])
+  @@index([guestEmail])
+  @@index([couponId])
+}
+
+model OrderItem {
+  id               String @id @default(cuid())
+  orderId          String
+  /// FK mantida para auditoria — pode apontar para variante de produto soft-deleted.
+  productVariantId String
+
+  // ---- Snapshot dos dados do produto (imutável) ----
+  productName        String
+  variantName        String
+  sku                String
+  imageUrl           String?
+  /// Snapshot dos atributos da variante no momento da compra
+  /// (idioma, condição, edição, com caixa, etc.). Usado na NF-e e histórico.
+  attributesSnapshot Json?
+
+  unitPrice  Decimal @db.Decimal(10, 2)
+  quantity   Int
+  totalPrice Decimal @db.Decimal(10, 2)
+
+  /// Item é pré-venda — usado para fluxo de NF-e adiada e separação no AWAITING_RELEASE.
+  isPreOrder  Boolean   @default(false)
+  /// Data de lançamento copiada do produto no momento da compra (preserva mesmo se mudar depois).
+  releaseDate DateTime?
+
+  createdAt DateTime @default(now())
+
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productVariantId])
+  @@index([isPreOrder])
+}
+
+/// Trilha de auditoria de mudanças de status do pedido.
+model OrderStatusHistory {
+  id         String       @id @default(cuid())
+  orderId    String
+  /// Status anterior — null na criação do pedido.
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  /// Usuário que fez a mudança — null para mudanças automáticas (webhooks).
+  changedBy  String?
+  notes      String?
+  createdAt  DateTime     @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  orderId String @unique
+
+  provider          PaymentProvider @default(STRIPE)
+  /// Stripe Payment Intent ID ou Charge ID.
+  providerPaymentId String?         @unique
+  /// Stripe Checkout Session ID — usado para reconciliar webhooks.
+  providerSessionId String?         @unique
+
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
+
+  amount         Decimal @db.Decimal(10, 2)
+  refundedAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  paidAt     DateTime?
+  failedAt   DateTime?
+  refundedAt DateTime?
+
+  failureReason String?
+  /// Payload completo do Stripe para debug e auditoria (não usar em queries).
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([providerPaymentId])
+  @@index([createdAt])
+}
+
+model Coupon {
+  id                 String       @id @default(cuid())
+  /// Sempre uppercase — normalizado na aplicação.
+  code               String       @unique
+  description        String?
+  discountType       DiscountType
+  /// Para PERCENTAGE: 0-100. Para FIXED_AMOUNT: valor em R$. Para FREE_SHIPPING: ignorado.
+  discountValue      Decimal      @db.Decimal(10, 2)
+  /// Valor mínimo de carrinho para o cupom ser aceito.
+  minimumPurchase    Decimal?     @db.Decimal(10, 2)
+  /// Limite global de usos — null = ilimitado.
+  maxUses            Int?
+  usedCount          Int          @default(0)
+  /// Limite de usos por usuário (default 1).
+  maxUsesPerUser     Int          @default(1)
+  startsAt           DateTime
+  expiresAt          DateTime
+  isActive           Boolean      @default(true)
+  /// False = bloqueia uso em carrinhos que contenham itens em pré-venda.
+  appliesToPreOrders Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  orders Order[]
+
+  @@index([isActive])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// 4.5 INTEGRAÇÃO MELHOR ENVIO
+// ============================================================
+
+/// Cache de cotações de frete feitas durante o checkout (TTL 1h).
+/// Útil para auditoria e para evitar recotação a cada refresh.
+model ShippingQuote {
+  id                 String   @id @default(cuid())
+  cartId             String?
+  userId             String?
+  /// CEP de origem (sempre o CEP da loja em Itapetininga).
+  originZipCode      String
+  destinationZipCode String
+  /// Itens enviados na cotação — peso, dimensões e quantidade.
+  productsPayload    Json
+  /// Array completo de cotações retornadas pelo Melhor Envio.
+  quotesPayload      Json
+  /// Serviço escolhido pelo cliente (null se ainda não selecionou).
+  selectedServiceId  Int?
+  selectedPrice      Decimal? @db.Decimal(10, 2)
+  /// 1h após criação — cotações expiradas são re-feitas no próximo cálculo.
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  cart Cart? @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([cartId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Eventos recebidos pelos webhooks do Melhor Envio.
+/// Persistidos para auditoria e processamento idempotente.
+model MeWebhookEvent {
+  id              String    @id @default(cuid())
+  /// Tipo do evento (ex: "order.posted", "order.delivered", "order.cancelled").
+  eventType       String
+  meOrderId       String
+  /// Match com o Order local — null se o webhook chegou antes do match.
+  orderId         String?
+  /// Corpo completo do webhook para auditoria.
+  payload         Json
+  /// Marca quando o handler processou o evento (null = pendente).
+  processedAt     DateTime?
+  /// Mensagem de erro se o processamento falhou (para retry/inspeção).
+  processingError String?
+  createdAt       DateTime  @default(now())
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([meOrderId])
+  @@index([eventType])
+  @@index([processedAt])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 5. NOTA FISCAL ELETRÔNICA
+// ============================================================
+
+model Invoice {
+  id      String @id @default(cuid())
+  orderId String @unique
+
+  /// Provider de NF-e — atualmente apenas Focus NFe.
+  provider          String        @default("FOCUS_NFE")
+  /// Referência única enviada ao Focus NFe — usada para idempotência.
+  providerReference String        @unique
+  status            InvoiceStatus @default(PENDING)
+
+  /// Número da NF-e após autorização. Atribuído pelo SEFAZ.
+  nfeNumber String?
+  /// Série da NF-e configurada na emissora.
+  nfeSeries String?
+  /// Chave de acesso de 44 dígitos da NF-e autorizada.
+  accessKey String?
+  pdfUrl    String?
+  xmlUrl    String?
+
+  issuedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  rejectionReason    String?
+
+  /// Payload do último webhook recebido — para debug e auditoria.
+  lastWebhookPayload Json?
+  /// Contador de tentativas de emissão — usado para backoff exponencial.
+  retryCount         Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([providerReference])
+  @@index([nfeNumber])
+}
+
+// ============================================================
+// 6. AVALIAÇÕES E WISHLIST
+// ============================================================
+
+model Review {
+  id                 String   @id @default(cuid())
+  productId          String
+  userId             String
+  /// Pedido associado — quando preenchido, marca a review como "compra verificada".
+  orderId            String?
+  /// Nota de 1 a 5 — validar range na aplicação.
+  rating             Int
+  title              String?
+  comment            String?  @db.Text
+  isVerifiedPurchase Boolean  @default(false)
+  /// Moderação obrigatória — reviews aparecem na vitrine só após aprovação.
+  isApproved         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId, orderId])
+  @@index([productId])
+  @@index([userId])
+  @@index([isApproved])
+  @@index([rating])
+}
+
+/// Favoritos do usuário (exibido como "Favoritos" na UI).
+/// Mantém o nome técnico `WishlistItem` por convenção do ecossistema.
+model WishlistItem {
+  id              String   @id @default(cuid())
+  userId          String
+  productId       String
+  /// Quando true, dispara e-mail para o usuário ao voltar ao estoque
+  /// ou ao encerrar pré-venda. Consultado em jobs de notificação.
+  notifyOnRestock Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  /// Compound — acelera "buscar todos os usuários a notificar para o produto X".
+  @@index([productId, notifyOnRestock])
+}
+
+// ============================================================
+// 7. NEWSLETTER E MARKETING
+// ============================================================
+
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  /// LGPD: confirmação via double opt-in. Null = ainda não confirmou.
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  /// Origem da captura (ex: "homepage_footer", "checkout", "popup").
+  source         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([confirmedAt])
+  @@index([unsubscribedAt])
+  @@index([source])
+}
