@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
+import { auth, unstable_update } from "@/auth";
 import { profileSchema, addressSchema } from "@/lib/validators/account";
 import type { ActionResult } from "@/server/actions/auth-actions";
 
@@ -47,15 +47,32 @@ export async function updateProfile(
   }
 
   const { prisma } = await import("@/lib/prisma");
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: {
-      name: parsed.data.name,
-      phone: parsed.data.phone || null,
-      cpf: parsed.data.cpf?.replace(/\D/g, "") || null,
-      birthDate: parsed.data.birthDate ? new Date(parsed.data.birthDate) : null,
-      marketingOptIn: parsed.data.marketingOptIn,
-    },
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        name: parsed.data.name,
+        phone: parsed.data.phone || null,
+        cpf: parsed.data.cpf?.replace(/\D/g, "") || null,
+        birthDate: parsed.data.birthDate ? new Date(parsed.data.birthDate) : null,
+        marketingOptIn: parsed.data.marketingOptIn,
+      },
+    });
+  } catch (err) {
+    // P2025 = "Record not found" — JWT aponta pra ID inexistente (sessão obsoleta)
+    if (err instanceof Error && "code" in err && err.code === "P2025") {
+      return {
+        ok: false,
+        error:
+          "Sua sessão é de um cadastro antigo. Saia e entre novamente pra continuar.",
+      };
+    }
+    throw err;
+  }
+
+  // Sincronizar o JWT — propaga `name` pro cookie da sessão (sem precisar relogar)
+  await unstable_update({
+    user: { name: parsed.data.name },
   });
 
   revalidatePath("/conta");

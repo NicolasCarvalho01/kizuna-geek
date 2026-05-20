@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { WishlistButton } from "@/components/product/wishlist-button";
+import { CepCalculator } from "@/components/product/cep-calculator";
 import { useCart } from "@/stores/cart-store";
 import { cn, formatBRL, formatDate } from "@/lib/utils";
 import type { Product } from "@/server/queries/products";
@@ -185,6 +186,14 @@ export function ProductActions({ product }: ProductActionsProps) {
           className="w-full"
         />
       </div>
+
+      {/* Cotação de frete */}
+      <CepCalculator
+        productId={product.id}
+        weightGrams={product.weight}
+        dimensions={product.dimensions}
+        unitPrice={unitPrice}
+      />
 
       {/* Trust strip */}
       <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-7 border-t border-[color:var(--color-hairline)] text-[var(--text-caption)] text-[color:var(--color-fg-soft)]">

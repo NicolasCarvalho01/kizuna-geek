@@ -6,12 +6,15 @@ export const metadata = {
   title: "Dados pessoais",
 };
 
+const USE_DEMO = !process.env.DATABASE_URL;
+
 export default async function PersonalDataPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  // Em modo demo, carregamos da session direto. Com DB: buscar do Prisma com tudo.
-  const userData = {
+  // Carrega do DB quando disponível — fonte canônica (evita stale JWT).
+  // Em modo demo, cai pra session direto.
+  let profile = {
     name: session.user.name ?? "",
     email: session.user.email ?? "",
     phone: "",
@@ -19,6 +22,33 @@ export default async function PersonalDataPage() {
     birthDate: "",
     marketingOptIn: false,
   };
+
+  if (!USE_DEMO) {
+    const { prisma } = await import("@/lib/prisma");
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        cpf: true,
+        birthDate: true,
+        marketingOptIn: true,
+      },
+    });
+    if (dbUser) {
+      profile = {
+        name: dbUser.name ?? "",
+        email: dbUser.email,
+        phone: dbUser.phone ?? "",
+        cpf: dbUser.cpf ?? "",
+        birthDate: dbUser.birthDate
+          ? dbUser.birthDate.toISOString().slice(0, 10)
+          : "",
+        marketingOptIn: dbUser.marketingOptIn,
+      };
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -33,7 +63,7 @@ export default async function PersonalDataPage() {
         </p>
       </div>
 
-      <ProfileForm initial={userData} />
+      <ProfileForm initial={profile} />
     </div>
   );
 }

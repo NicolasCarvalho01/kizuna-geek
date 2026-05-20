@@ -6,6 +6,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Gallery } from "@/components/product/gallery";
 import { ProductActions } from "@/components/product/product-actions";
 import { ProductCard } from "@/components/catalog/product-card";
+import { JsonLd, productJsonLd, breadcrumbJsonLd } from "@/components/seo/json-ld";
 import { getProductBySlug, getRelatedProducts } from "@/server/queries/products";
 
 interface ProductPageProps {
@@ -36,8 +37,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const related = await getRelatedProducts(product.id, 4);
 
+  const categorySlug = product.category.slug.split("-")[0];
+
   return (
     <>
+      <JsonLd
+        data={[
+          productJsonLd(product),
+          breadcrumbJsonLd([
+            { name: "Início", url: "/" },
+            { name: product.category.name, url: `/catalogo/${categorySlug}` },
+            { name: product.name, url: `/produto/${product.slug}` },
+          ]),
+        ]}
+      />
       {/* Breadcrumb */}
       <nav
         aria-label="Trilha"
@@ -75,9 +88,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <Eyebrow index="—">Descrição</Eyebrow>
             </div>
             <div className="col-span-12 lg:col-span-7 lg:col-start-5">
-              <p className="text-[var(--text-lead)] leading-[var(--leading-relaxed)] text-[color:var(--color-fg)]">
-                {product.description}
-              </p>
+              {/^\s*<(p|h[1-6]|ul|ol|blockquote|hr|div)/i.test(product.description ?? "") ? (
+                // Descrição HTML (Tiptap) — sanitizada pelo whitelist do editor
+                <div
+                  className="product-description text-[var(--text-body)] leading-[var(--leading-relaxed)] text-[color:var(--color-fg)] [&_h2]:font-[var(--font-display)] [&_h2]:text-[1.5rem] [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:font-[var(--font-display)] [&_h3]:text-[1.25rem] [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_blockquote]:border-l-2 [&_blockquote]:border-[color:var(--color-gold)] [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-5 [&_a]:text-[color:var(--color-gold)] [&_a]:underline [&_a]:underline-offset-2 [&_hr]:border-[color:var(--color-hairline)] [&_hr]:my-6"
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: product.description ?? "" }}
+                />
+              ) : (
+                <p className="text-[var(--text-lead)] leading-[var(--leading-relaxed)] text-[color:var(--color-fg)]">
+                  {product.description}
+                </p>
+              )}
 
               {/* Specs grid */}
               <dl className="mt-10 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5 pt-8 border-t border-[color:var(--color-hairline)]">

@@ -5,6 +5,7 @@ import { EditorialPicks } from "@/components/sections/editorial-picks";
 import { TcgSpotlight } from "@/components/sections/tcg-spotlight";
 import { BondStatement } from "@/components/sections/bond-statement";
 import { Newsletter } from "@/components/sections/newsletter";
+import { JsonLd, organizationJsonLd, websiteJsonLd } from "@/components/seo/json-ld";
 import { getFeaturedProducts, getProductsByType } from "@/server/queries/products";
 
 export default async function HomePage() {
@@ -15,6 +16,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
       <Hero />
       <PreOrderMarquee />
       <Categories />

@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Cormorant_Garamond, Geist, Geist_Mono, Noto_Serif_JP } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -70,7 +73,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  const [session, h] = await Promise.all([auth(), headers()]);
+  const pathname = h.get("x-pathname") ?? "";
+  const isAdmin = pathname.startsWith("/admin");
+
   const headerUser = session?.user
     ? {
         name: session.user.name,
@@ -92,13 +98,21 @@ export default async function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <div className="flex min-h-svh flex-col">
-            <SiteHeader user={headerUser} />
-            <main className="flex-1">{children}</main>
-            <SiteFooter />
-          </div>
+          {isAdmin ? (
+            // Admin tem layout próprio (sidebar fixa, sem header/footer públicos)
+            children
+          ) : (
+            <div className="flex min-h-svh flex-col">
+              <SiteHeader user={headerUser} />
+              <main className="flex-1">{children}</main>
+              <SiteFooter />
+            </div>
+          )}
           <CartDrawer />
         </ThemeProvider>
+        {/* Vercel Analytics + Speed Insights — no-op fora do Vercel */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

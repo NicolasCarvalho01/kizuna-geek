@@ -1,8 +1,9 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
-import { signIn, signOut } from "@/auth";
+import { signIn, signOut, auth } from "@/auth";
 import { loginSchema, signupSchema, passwordResetRequestSchema } from "@/lib/validators/auth";
 import { findDemoUserByEmail } from "@/server/demo-users";
 
@@ -41,15 +42,15 @@ export async function signInWithCredentials(
     };
   }
 
-  const from = (formData.get("from") as string | null) || "/conta";
+  const fromParam = (formData.get("from") as string | null)?.trim() || null;
 
   try {
+    // Autentica sem redirect automático — vamos decidir manualmente onde mandar
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: from,
+      redirect: false,
     });
-    return { ok: true };
   } catch (err) {
     if (err instanceof AuthError) {
       if (err.type === "CredentialsSignin") {
@@ -57,9 +58,20 @@ export async function signInWithCredentials(
       }
       return { ok: false, error: "Erro ao entrar. Tente novamente." };
     }
-    // Next.js usa erros thrown pra redirecionar — repassar
     throw err;
   }
+
+  // Decide destino baseado no `from` (se veio de página protegida) ou no role
+  let target = fromParam;
+  if (!target) {
+    // Sem `from` específico — manda admin pro painel, cliente pra /conta
+    const session = await auth();
+    const role = session?.user?.role;
+    target = role === "ADMIN" || role === "STAFF" ? "/admin" : "/conta";
+  }
+
+  // `redirect()` joga uma exception especial do Next que faz o redirect (never)
+  redirect(target);
 }
 
 // =====================================================================
@@ -122,9 +134,17 @@ export async function signUpWithCredentials(
       passwordHash,
       role: "CUSTOMER",
       marketingOptIn,
-      // emailVerified fica null — gera token e envia e-mail (Fase 6)
+      // emailVerified fica null — gera token e envia verificação (TODO: usar PasswordResetToken-like)
     },
   });
+
+  // Email de boas-vindas (fire-and-forget — não bloqueia cadastro)
+  try {
+    const { sendWelcomeEmail } = await import("@/server/services/emails");
+    await sendWelcomeEmail({ email, name });
+  } catch (err) {
+    console.error("[signup] welcome email failed:", err);
+  }
 
   // Auto-login após cadastro
   try {

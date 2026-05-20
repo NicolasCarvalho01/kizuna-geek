@@ -98,7 +98,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 // NextAuth
 // =====================================================================
 
-export const { auth, signIn, signOut, handlers } = NextAuth({
+export const { auth, signIn, signOut, handlers, unstable_update } = NextAuth({
   ...authConfig,
   providers,
   callbacks: {
@@ -130,17 +130,31 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // No sign-in inicial: popular o token com dados do usuário
       if (user) {
         token.id = user.id as string;
         token.role = user.role;
       }
+
+      // Quando o cliente/server chama `unstable_update`, o trigger é "update"
+      // e `session` contém os campos alterados — propagar pro token.
+      if (trigger === "update" && session?.user) {
+        if (typeof session.user.name === "string") token.name = session.user.name;
+        if (typeof session.user.email === "string") token.email = session.user.email;
+        if (typeof session.user.image === "string") token.picture = session.user.image;
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
+        // Garantir que name/email/image do token (atualizados via unstable_update) cheguem na session
+        if (token.name) session.user.name = token.name;
+        if (token.email) session.user.email = token.email;
+        if (token.picture) session.user.image = token.picture;
       }
       return session;
     },

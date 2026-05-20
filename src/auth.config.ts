@@ -16,6 +16,26 @@ export const authConfig = {
     updateAge: 60 * 60 * 24, // refresh a cada 24h
   },
   callbacks: {
+    // jwt: roda em sign-in e injeta role + id no token (necessário pro middleware)
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id as string;
+        token.role = user.role;
+      }
+      return token;
+    },
+    // session: roda em cada chamada de `auth()` — inclusive na Edge middleware.
+    // Propaga role/id do token pro session.user pra autorização funcionar.
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as typeof session.user.role;
+        if (token.name) session.user.name = token.name as string;
+        if (token.email) session.user.email = token.email as string;
+        if (token.picture) session.user.image = token.picture as string;
+      }
+      return session;
+    },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const role = auth?.user?.role;
