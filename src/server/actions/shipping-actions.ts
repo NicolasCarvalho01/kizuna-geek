@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   calculateShipping,
   meConfigured,
+  meLiveQuoteEnabled,
   MeApiError,
   type MeQuote,
 } from "@/lib/melhor-envio";
@@ -128,9 +129,12 @@ export async function quoteShipping(
 
     // Fallback de dev: sandbox do ME costuma só retornar Jadlog e/ou só "indisponível".
     // Se houver < 2 opções válidas, injeta cotações mock pra desbloquear o teste do checkout.
-    // Em produção (token live), não passa por aqui.
+    //
+    // Desativado quando MELHOR_ENVIO_LIVE_TOKEN está setado (cotação real em
+    // produção já entrega valores corretos — mock só atrapalha).
     const validQuotes = options.filter((o) => !o.error && o.price > 0);
-    if (process.env.MELHOR_ENVIO_SANDBOX === "true" && validQuotes.length < 2) {
+    const sandboxMode = process.env.MELHOR_ENVIO_SANDBOX === "true";
+    if (sandboxMode && !meLiveQuoteEnabled && validQuotes.length < 2) {
       const mocked = buildMockQuotes(parsed.data.items, destinationZip);
       options = [...validQuotes, ...mocked].sort((a, b) => a.price - b.price);
       console.info(

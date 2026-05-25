@@ -28,6 +28,19 @@ const USER_AGENT = "Kizuna Geek <niaupuca@gmail.com>";
 /** Indica se o Melhor Envio está configurado */
 export const meConfigured = !!process.env.MELHOR_ENVIO_TOKEN;
 
+/**
+ * URL de produção do ME — sempre fixa, usada pra cotação real mesmo quando
+ * outras operações estão em sandbox.
+ *
+ * Cotação é endpoint público e gratuito do ME — não cobra nada, não exige
+ * saldo, não emite cobrança. Roteamos cotação pra produção quando
+ * `MELHOR_ENVIO_LIVE_TOKEN` está setado, mantendo compra de etiqueta em
+ * sandbox até o lojista ter CNPJ + saldo na conta de produção.
+ */
+const LIVE_BASE_URL = "https://www.melhorenvio.com.br";
+const LIVE_TOKEN = process.env.MELHOR_ENVIO_LIVE_TOKEN;
+export const meLiveQuoteEnabled = !!LIVE_TOKEN;
+
 // =====================================================================
 // TIPOS
 // =====================================================================
@@ -245,15 +258,67 @@ async function meRequest<T>(
  * Retorna array de opções (Correios PAC, SEDEX, Jadlog, Loggi, etc.).
  *
  * Cotações expiradas ou inválidas vêm com `error` preenchido em vez de preço.
+ *
+ * Roteamento:
+ *  - Se `MELHOR_ENVIO_LIVE_TOKEN` está setado → cota em PRODUÇÃO (real, gratuito,
+ *    sem debitar saldo, valores corretos). Recomendado pra mostrar preço real
+ *    pro cliente mesmo enquanto a compra de etiqueta ainda usa sandbox.
+ *  - Senão → cota usando o token padrão (sandbox se SANDBOX=true, prod caso
+ *    contrário).
  */
 export async function calculateShipping(
   input: MeCalculateInput,
 ): Promise<MeQuote[]> {
-  const quotes = await meRequest<MeQuote[]>("/api/v2/me/shipment/calculate", {
+  if (LIVE_TOKEN) {
+    return liveQuoteRequest<MeQuote[]>("/api/v2/me/shipment/calculate", {
+      method: "POST",
+      json: input,
+    });
+  }
+  return meRequest<MeQuote[]>("/api/v2/me/shipment/calculate", {
     method: "POST",
     json: input,
   });
-  return quotes;
+}
+
+/**
+ * Variante de `meRequest` que sempre bate na URL de produção do ME e usa
+ * o `MELHOR_ENVIO_LIVE_TOKEN`. Isolada pra não contaminar as outras chamadas
+ * (compra de etiqueta, balance, etc.) que devem seguir o modo principal.
+ */
+async function liveQuoteRequest<T>(
+  path: string,
+  init: RequestInit & { json?: unknown } = {},
+): Promise<T> {
+  if (!LIVE_TOKEN) {
+    throw new MeApiError(0, null, "MELHOR_ENVIO_LIVE_TOKEN não configurado.");
+  }
+  const { json, ...rest } = init;
+  const res = await fetch(`${LIVE_BASE_URL}${path}`, {
+    ...rest,
+    headers: {
+      Authorization: `Bearer ${LIVE_TOKEN}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+      ...rest.headers,
+    },
+    body: json !== undefined ? JSON.stringify(json) : rest.body,
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      // ignore
+    }
+    throw new MeApiError(
+      res.status,
+      body,
+      `Melhor Envio LIVE ${res.status}: ${path}`,
+    );
+  }
+  return (await res.json()) as T;
 }
 
 /** Lista transportadoras suportadas pela conta */
