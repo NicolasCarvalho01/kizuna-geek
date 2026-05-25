@@ -3,9 +3,48 @@
 import { revalidatePath } from "next/cache";
 import { auth, unstable_update } from "@/auth";
 import { profileSchema, addressSchema } from "@/lib/validators/account";
+import { lookupCep } from "@/lib/viacep";
 import type { ActionResult } from "@/server/actions/auth-actions";
 
 const USE_DEMO = !process.env.DATABASE_URL;
+
+// =====================================================================
+// LOOKUP DE CEP (ViaCEP)
+// =====================================================================
+// Server Action chamada pelo AddressForm quando o usuário sai do campo CEP.
+// Não exige autenticação — ViaCEP é endpoint público gratuito.
+// O server-only do viacep.ts impede chamada direta do browser; essa action
+// é a interface segura.
+export async function lookupCepAction(cep: string): Promise<
+  ActionResult<{
+    street: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    complement: string | null;
+  }>
+> {
+  const result = await lookupCep(cep);
+  if (!result.ok) {
+    const message =
+      result.error === "invalid_format"
+        ? "CEP inválido."
+        : result.error === "not_found"
+          ? "CEP não encontrado."
+          : "Erro ao consultar CEP. Preencha manualmente.";
+    return { ok: false, error: message };
+  }
+  return {
+    ok: true,
+    data: {
+      street: result.address.street,
+      neighborhood: result.address.neighborhood,
+      city: result.address.city,
+      state: result.address.state,
+      complement: result.address.complement,
+    },
+  };
+}
 
 // =====================================================================
 // PERFIL

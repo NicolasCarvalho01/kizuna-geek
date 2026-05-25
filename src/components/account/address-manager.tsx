@@ -6,7 +6,7 @@ import { Check, Loader2, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { Field } from "@/components/auth/login-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { saveAddress, deleteAddress } from "@/server/actions/account-actions";
+import { saveAddress, deleteAddress, lookupCepAction } from "@/server/actions/account-actions";
 import { cn } from "@/lib/utils";
 
 interface Address {
@@ -186,9 +186,51 @@ function AddressForm({
 }) {
   const [state, formAction, pending] = useActionState(saveAddress, null);
 
+  // Campos controlados — necessário pra auto-fill via ViaCEP
+  const [zipCode, setZipCode] = React.useState(initial?.zipCode ?? "");
+  const [street, setStreet] = React.useState(initial?.street ?? "");
+  const [neighborhood, setNeighborhood] = React.useState(initial?.neighborhood ?? "");
+  const [city, setCity] = React.useState(initial?.city ?? "");
+  const [stateUf, setStateUf] = React.useState(initial?.state ?? "");
+
+  const [cepLookingUp, setCepLookingUp] = React.useState(false);
+  const [cepLookupError, setCepLookupError] = React.useState<string | null>(null);
+  // Evita lookup duplicado pro mesmo CEP (ex: blur + change)
+  const lastLookedCep = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     if (state?.ok) onClose();
   }, [state, onClose]);
+
+  /**
+   * Dispara o lookup do CEP via ViaCEP (Server Action).
+   * Preenche logradouro/bairro/cidade/UF apenas se estiverem vazios —
+   * preserva edições manuais do usuário.
+   */
+  async function tryLookupCep(rawCep: string) {
+    const digits = rawCep.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    if (lastLookedCep.current === digits) return;
+    lastLookedCep.current = digits;
+
+    setCepLookingUp(true);
+    setCepLookupError(null);
+
+    const result = await lookupCepAction(digits);
+
+    setCepLookingUp(false);
+
+    if (result.ok && result.data) {
+      // Só preenche o que está vazio — não sobrescreve manual
+      if (!street.trim() && result.data.street) setStreet(result.data.street);
+      if (!neighborhood.trim() && result.data.neighborhood)
+        setNeighborhood(result.data.neighborhood);
+      if (!city.trim() && result.data.city) setCity(result.data.city);
+      if (!stateUf.trim() && result.data.state) setStateUf(result.data.state);
+    } else {
+      setCepLookupError(result.error ?? "Erro ao consultar CEP.");
+    }
+  }
 
   return (
     <form
@@ -224,16 +266,40 @@ function AddressForm({
           label="CEP"
           name="zipCode"
           required
-          defaultValue={initial?.zipCode}
-          error={state?.fields?.zipCode}
+          value={zipCode}
+          onChange={(e) => {
+            setZipCode(e.target.value);
+            setCepLookupError(null);
+            // Auto-lookup quando completar 8 dígitos (sem precisar sair do campo)
+            const digits = e.target.value.replace(/\D/g, "");
+            if (digits.length === 8) {
+              void tryLookupCep(digits);
+            }
+          }}
+          onBlur={(e) => void tryLookupCep(e.target.value)}
+          error={state?.fields?.zipCode ?? cepLookupError ?? undefined}
           placeholder="00000-000"
+          inputMode="numeric"
+          autoComplete="postal-code"
+          maxLength={9}
+          rightAdornment={
+            cepLookingUp ? (
+              <Loader2
+                className="h-4 w-4 animate-spin text-[color:var(--color-gold)]"
+                strokeWidth={1.5}
+                aria-label="Consultando CEP"
+              />
+            ) : null
+          }
         />
         <Field
           label="Logradouro"
           name="street"
           required
-          defaultValue={initial?.street}
+          value={street}
+          onChange={(e) => setStreet(e.target.value)}
           error={state?.fields?.street}
+          autoComplete="address-line1"
         />
       </div>
 
@@ -244,6 +310,7 @@ function AddressForm({
           required
           defaultValue={initial?.number}
           error={state?.fields?.number}
+          inputMode="numeric"
         />
         <Field
           label="Complemento"
@@ -251,6 +318,7 @@ function AddressForm({
           defaultValue={initial?.complement ?? ""}
           error={state?.fields?.complement}
           placeholder="Apto, bloco… (opcional)"
+          autoComplete="address-line2"
         />
       </div>
 
@@ -258,7 +326,8 @@ function AddressForm({
         label="Bairro"
         name="neighborhood"
         required
-        defaultValue={initial?.neighborhood}
+        value={neighborhood}
+        onChange={(e) => setNeighborhood(e.target.value)}
         error={state?.fields?.neighborhood}
         className="mt-4"
       />
@@ -268,17 +337,21 @@ function AddressForm({
           label="Cidade"
           name="city"
           required
-          defaultValue={initial?.city}
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
           error={state?.fields?.city}
+          autoComplete="address-level2"
         />
         <Field
           label="UF"
           name="state"
           required
           maxLength={2}
-          defaultValue={initial?.state}
+          value={stateUf}
+          onChange={(e) => setStateUf(e.target.value.toUpperCase())}
           error={state?.fields?.state}
           placeholder="SP"
+          autoComplete="address-level1"
         />
       </div>
 
