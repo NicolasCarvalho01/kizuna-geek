@@ -124,9 +124,9 @@ export async function updateProfile(
 // =====================================================================
 
 export async function saveAddress(
-  _prev: ActionResult | null,
+  _prev: ActionResult<{ addressId: string }> | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ addressId: string }>> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Não autenticado." };
 
@@ -176,24 +176,30 @@ export async function saveAddress(
     });
   }
 
+  let addressId: string;
   if (id) {
-    await prisma.address.update({
+    const updated = await prisma.address.update({
       where: { id, userId: session.user.id },
       data: { ...rest, complement: complement || null, isDefault },
+      select: { id: true },
     });
+    addressId = updated.id;
   } else {
-    await prisma.address.create({
+    const created = await prisma.address.create({
       data: {
         ...rest,
         complement: complement || null,
         isDefault,
         userId: session.user.id,
       },
+      select: { id: true },
     });
+    addressId = created.id;
   }
 
   revalidatePath("/conta/enderecos");
-  return { ok: true };
+  revalidatePath("/checkout");
+  return { ok: true, data: { addressId } };
 }
 
 export async function deleteAddress(addressId: string): Promise<ActionResult> {

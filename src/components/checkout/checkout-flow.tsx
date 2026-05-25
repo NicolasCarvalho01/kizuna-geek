@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -12,10 +13,12 @@ import {
   Plus,
   Truck,
   Lock,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { AddressForm } from "@/components/account/address-form";
 import {
   useCart,
   cartSubtotal,
@@ -48,6 +51,7 @@ interface CheckoutFlowProps {
 }
 
 export function CheckoutFlow({ addresses, demoMode }: CheckoutFlowProps) {
+  const router = useRouter();
   const lines = useCart((s) => s.lines);
   const subtotal = useCart(cartSubtotal);
   const hasPreOrder = useCart(cartHasPreOrder);
@@ -64,7 +68,24 @@ export function CheckoutFlow({ addresses, demoMode }: CheckoutFlowProps) {
   const [submitting, startSubmit] = React.useTransition();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
+  // Form inline de novo endereço dentro do checkout
+  const [showAddressForm, setShowAddressForm] = React.useState(addresses.length === 0);
+  // ID pendente pra selecionar após router.refresh() atualizar a prop addresses
+  const pendingNewAddressId = React.useRef<string | null>(null);
+
   React.useEffect(() => setHydrated(true), []);
+
+  // Quando a lista de addresses atualiza (após router.refresh) e tem um ID
+  // pendente que agora existe na lista, seleciona automaticamente
+  React.useEffect(() => {
+    if (
+      pendingNewAddressId.current &&
+      addresses.some((a) => a.id === pendingNewAddressId.current)
+    ) {
+      setSelectedAddressId(pendingNewAddressId.current);
+      pendingNewAddressId.current = null;
+    }
+  }, [addresses]);
 
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
   const total = subtotal + (selectedShipping?.price ?? 0);
@@ -153,58 +174,113 @@ export function CheckoutFlow({ addresses, demoMode }: CheckoutFlowProps) {
     return <EmptyCart />;
   }
 
-  if (addresses.length === 0) {
-    return <NoAddress />;
-  }
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_24rem] gap-10 lg:gap-14">
       <div className="space-y-10">
         {/* Step 1 — Endereço */}
         <Step number="01" icon={MapPin} title="Endereço de entrega">
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {addresses.map((addr) => (
-              <li key={addr.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAddressId(addr.id)}
-                  className={cn(
-                    "w-full text-left p-4 rounded-[var(--radius-md)] border",
-                    "transition-all duration-[var(--motion-fast)] ease-[var(--ease-out-3)]",
-                    selectedAddressId === addr.id
-                      ? "border-[color:var(--color-gold)] bg-[color:var(--color-gold)]/8"
-                      : "border-[color:var(--color-border)] hover:border-[color:var(--color-fg-soft)]",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="eyebrow">{addr.label}</p>
-                    {addr.isDefault && (
-                      <Badge variant="gold" size="sm">
-                        Padrão
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-[var(--font-display)] text-[1rem] leading-tight mb-1">
-                    {addr.recipientName}
-                  </p>
-                  <p className="text-[var(--text-caption)] text-[color:var(--color-fg-soft)] leading-snug">
-                    {addr.street}, {addr.number}
-                    {addr.complement && ` · ${addr.complement}`}
-                    <br />
-                    {addr.neighborhood} · {addr.city}/{addr.state} ·{" "}
-                    {formatCep(addr.zipCode)}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/conta/enderecos"
-            className="mt-3 inline-flex items-center gap-2 text-[var(--text-caption)] text-[color:var(--color-gold)] hover:text-[color:var(--color-gold-soft)] transition-colors"
-          >
-            <Plus className="h-3 w-3" strokeWidth={1.5} />
-            Adicionar novo endereço
-          </Link>
+          {addresses.length === 0 && !showAddressForm && (
+            <div className="rounded-[var(--radius-md)] border border-dashed border-[color:var(--color-border-strong)] p-6 text-center mb-3">
+              <p className="text-[var(--text-caption)] text-[color:var(--color-fg-soft)]">
+                Você ainda não tem endereço cadastrado.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setShowAddressForm(true)}
+                className="mt-3"
+              >
+                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                Cadastrar endereço de entrega
+              </Button>
+            </div>
+          )}
+
+          {addresses.length > 0 && (
+            <>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {addresses.map((addr) => (
+                  <li key={addr.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddressId(addr.id)}
+                      className={cn(
+                        "w-full text-left p-4 rounded-[var(--radius-md)] border",
+                        "transition-all duration-[var(--motion-fast)] ease-[var(--ease-out-3)]",
+                        selectedAddressId === addr.id
+                          ? "border-[color:var(--color-gold)] bg-[color:var(--color-gold)]/8"
+                          : "border-[color:var(--color-border)] hover:border-[color:var(--color-fg-soft)]",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="eyebrow">{addr.label}</p>
+                        {addr.isDefault && (
+                          <Badge variant="gold" size="sm">
+                            Padrão
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="font-[var(--font-display)] text-[1rem] leading-tight mb-1">
+                        {addr.recipientName}
+                      </p>
+                      <p className="text-[var(--text-caption)] text-[color:var(--color-fg-soft)] leading-snug">
+                        {addr.street}, {addr.number}
+                        {addr.complement && ` · ${addr.complement}`}
+                        <br />
+                        {addr.neighborhood} · {addr.city}/{addr.state} ·{" "}
+                        {formatCep(addr.zipCode)}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {!showAddressForm && (
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressForm(true)}
+                    className="inline-flex items-center gap-2 text-[var(--text-caption)] text-[color:var(--color-gold)] hover:text-[color:var(--color-gold-soft)] transition-colors"
+                  >
+                    <Plus className="h-3 w-3" strokeWidth={1.5} />
+                    Adicionar novo endereço
+                  </button>
+                  <span className="text-[var(--text-caption)] text-[color:var(--color-fg-mute)]">
+                    ·
+                  </span>
+                  <Link
+                    href="/conta/enderecos"
+                    className="text-[var(--text-caption)] text-[color:var(--color-fg-soft)] hover:text-[color:var(--color-fg)] transition-colors"
+                  >
+                    Gerenciar endereços
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Form inline de novo endereço — com auto-fill via ViaCEP */}
+          {showAddressForm && (
+            <div className="mt-4 relative">
+              <button
+                type="button"
+                onClick={() => setShowAddressForm(false)}
+                aria-label="Fechar"
+                className="absolute top-4 right-4 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--color-fg-soft)] hover:bg-[color:var(--color-bg-sunken)] hover:text-[color:var(--color-fg)] transition-colors"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+              <AddressForm
+                initial={null}
+                onClose={() => setShowAddressForm(false)}
+                onSaved={(addressId) => {
+                  // Marca o ID pra selecionar quando a prop addresses atualizar
+                  pendingNewAddressId.current = addressId;
+                  // Server Action já chamou revalidatePath("/checkout") — refresh
+                  // re-renderiza o RSC pai e atualiza a prop addresses
+                  router.refresh();
+                }}
+              />
+            </div>
+          )}
         </Step>
 
         {/* Step 2 — Frete */}
@@ -500,24 +576,6 @@ function EmptyCart() {
       </p>
       <Button asChild className="mt-6">
         <Link href="/catalogo">Voltar pro catálogo</Link>
-      </Button>
-    </div>
-  );
-}
-
-function NoAddress() {
-  return (
-    <div className="rounded-[var(--radius-lg)] border border-dashed border-[color:var(--color-border-strong)] p-10 text-center">
-      <MapPin className="h-7 w-7 mx-auto text-[color:var(--color-gold)]/60" strokeWidth={1.5} />
-      <h2 className="display text-[1.5rem] mt-4">Sem endereço cadastrado</h2>
-      <p className="mt-2 max-w-md mx-auto text-[var(--text-caption)] text-[color:var(--color-fg-soft)]">
-        Adicione um endereço de entrega antes de finalizar a compra.
-      </p>
-      <Button asChild className="mt-5">
-        <Link href="/conta/enderecos">
-          <Plus className="h-4 w-4" strokeWidth={1.5} />
-          Adicionar endereço
-        </Link>
       </Button>
     </div>
   );
