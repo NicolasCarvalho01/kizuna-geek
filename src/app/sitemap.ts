@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // ---- Páginas estáticas ----
   const staticRoutes: MetadataRoute.Sitemap = [
+    // === Páginas principais ===
     { url: `${BASE_URL}/`, lastModified: now, changeFrequency: "daily", priority: 1.0 },
     {
       url: `${BASE_URL}/catalogo`,
@@ -21,11 +22,57 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${BASE_URL}/lancamentos`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/pre-venda`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+
+    // === Páginas institucionais ===
+    {
       url: `${BASE_URL}/sobre`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.6,
     },
+    {
+      url: `${BASE_URL}/contato`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/perguntas`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/entrega`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/trocas`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/newsletter`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+
+    // === Auth ===
     {
       url: `${BASE_URL}/entrar`,
       lastModified: now,
@@ -34,6 +81,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${BASE_URL}/cadastrar`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+
+    // === Legal (LGPD) — indexar pra mostrar transparência ===
+    {
+      url: `${BASE_URL}/privacidade`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${BASE_URL}/termos`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${BASE_URL}/cookies`,
       lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
