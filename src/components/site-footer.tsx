@@ -4,6 +4,20 @@ import { Send } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { InstagramIcon, YoutubeIcon } from "@/components/brand/social-icons";
 
+// Dados fiscais — lidos das env vars (mesmas usadas no recibo e no Focus NFe)
+// pra fonte única de verdade. Fallback genérico só pra build sem .env.
+const EMITTER_NAME =
+  process.env.FOCUS_NFE_FANTASIA_EMITENTE ?? "Kizuna Geek";
+const EMITTER_CITY = process.env.FOCUS_NFE_MUNICIPIO_EMITENTE ?? "Itapetininga";
+const EMITTER_STATE = process.env.FOCUS_NFE_UF_EMITENTE ?? "SP";
+const EMITTER_CNPJ_RAW =
+  process.env.FOCUS_NFE_CNPJ_EMITENTE ?? "00000000000100";
+const EMITTER_CNPJ_FORMATTED = (() => {
+  const d = EMITTER_CNPJ_RAW.replace(/\D/g, "");
+  if (d.length !== 14) return EMITTER_CNPJ_RAW;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+})();
+
 const COLUMNS = [
   {
     title: "Catálogo",
@@ -127,7 +141,7 @@ export function SiteFooter() {
         {/* Rodapé legal */}
         <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[var(--text-caption)] text-[color:var(--color-fg-mute)]">
-            © {new Date().getFullYear()} Kizuna Geek · Itapetininga, SP · CNPJ 00.000.000/0001-00
+            © {new Date().getFullYear()} {EMITTER_NAME} · {EMITTER_CITY}, {EMITTER_STATE} · CNPJ {EMITTER_CNPJ_FORMATTED}
           </p>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[var(--text-caption)] text-[color:var(--color-fg-mute)]">
             <li>

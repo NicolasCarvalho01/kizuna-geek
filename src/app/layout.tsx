@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { CookieConsentBanner } from "@/components/cookies/consent-banner";
 import { auth } from "@/auth";
 import "./globals.css";
 
@@ -109,6 +110,9 @@ export default async function RootLayout({
             </div>
           )}
           <CartDrawer />
+          {/* Cookie consent banner (LGPD) — só na área pública. Admin é
+              operacional e já tem sessão autenticada com fluxo separado. */}
+          {!isAdmin && <CookieConsentBanner />}
         </ThemeProvider>
         {/* Vercel Analytics + Speed Insights — no-op fora do Vercel */}
         <Analytics />
