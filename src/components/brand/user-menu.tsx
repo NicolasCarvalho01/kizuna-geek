@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { LogIn, LogOut, Package, Heart, MapPin, User2, LayoutDashboard } from "lucide-react";
+import { LogOut, Package, Heart, MapPin, User2, LayoutDashboard } from "lucide-react";
 import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
 import { signOutAction } from "@/server/actions/auth-actions";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ export function UserMenu({ user }: UserMenuProps) {
         )}
         aria-label="Entrar na sua conta"
       >
-        <LogIn className="h-4 w-4" strokeWidth={1.5} />
+        <User2 className="h-4 w-4" strokeWidth={1.5} />
       </Link>
     );
   }
