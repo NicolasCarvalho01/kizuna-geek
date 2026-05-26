@@ -27,10 +27,16 @@ const USE_DB = !!process.env.DATABASE_URL;
 // Dados do emitente — reusa as mesmas envs do Focus NFe quando setadas
 // (assim quando virar ME, mesmos valores servem pros 2 contextos).
 const EMITTER = {
-  name:
+  // Razão social (nome jurídico) — vai como linha menor abaixo do nome fantasia
+  legalName:
     process.env.FOCUS_NFE_NOME_EMITENTE ??
     process.env.RECEIPT_EMITTER_NAME ??
     "Kizuna Geek (MEI)",
+  // Nome fantasia — vai como nome principal no recibo
+  tradeName:
+    process.env.FOCUS_NFE_FANTASIA_EMITENTE ??
+    process.env.RECEIPT_EMITTER_TRADE_NAME ??
+    "Kizuna Geek",
   cnpj:
     process.env.FOCUS_NFE_CNPJ_EMITENTE ??
     process.env.RECEIPT_EMITTER_CNPJ ??
@@ -521,10 +527,13 @@ function buildReceiptHtml({
     <div class="meta">
       <div class="meta-block">
         <div class="label">Vendedor</div>
-        <strong>${escape(EMITTER.name)}</strong>
-        <div class="muted">
-          CNPJ ${escape(EMITTER.cnpj)}<br>
-          ${escape(EMITTER.address.street)}, ${escape(EMITTER.address.number)}<br>
+        <strong>${escape(EMITTER.tradeName)}</strong>
+        <div class="muted" style="font-size: 9pt; opacity: 0.85; margin-top: 2px;">
+          ${escape(EMITTER.legalName)}
+        </div>
+        <div class="muted" style="margin-top: 6px;">
+          CNPJ ${escape(formatCnpj(EMITTER.cnpj))}<br>
+          ${escape(EMITTER.address.street)}${EMITTER.address.number ? `, ${escape(EMITTER.address.number)}` : ""}<br>
           ${escape(EMITTER.address.district)} · ${escape(EMITTER.address.city)}/${escape(EMITTER.address.state)}<br>
           CEP ${formatCep(EMITTER.address.cep)}<br>
           ${escape(EMITTER.email)}
@@ -674,4 +683,10 @@ function formatDate(date: Date): string {
 function formatCep(cep: string): string {
   const digits = cep.replace(/\D/g, "");
   return digits.length === 8 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : cep;
+}
+
+function formatCnpj(cnpj: string): string {
+  const digits = cnpj.replace(/\D/g, "");
+  if (digits.length !== 14) return cnpj;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }
