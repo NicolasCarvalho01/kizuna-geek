@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, MapPin, Package, User } from "lucide-react";
+import { ArrowUpRight, FileText, MapPin, Package, Printer, User } from "lucide-react";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -122,6 +122,38 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             : null
         }
       />
+
+      {/* Recibo de venda (não-fiscal) — pra MEI ou complemento à NF-e */}
+      {order.status !== "PENDING" && order.status !== "CANCELLED" && (
+        <section className="rounded-[var(--radius-lg)] border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3">
+              <FileText
+                className="h-4 w-4 mt-1 text-[color:var(--color-gold)] shrink-0"
+                strokeWidth={1.5}
+              />
+              <div>
+                <p className="font-[var(--font-display)] text-[1.0625rem] leading-snug">
+                  Recibo de venda
+                </p>
+                <p className="mt-1 text-[var(--text-caption)] text-[color:var(--color-fg-soft)]">
+                  Documento não-fiscal — útil pra imprimir junto com a etiqueta
+                  ou enviar pro cliente que pedir.
+                </p>
+              </div>
+            </div>
+            <a
+              href={`/api/recibo/${order.orderNumber}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--radius-sm)] border border-[color:var(--color-border-strong)] text-[0.875rem] text-[color:var(--color-fg)] hover:border-[color:var(--color-gold)] hover:text-[color:var(--color-gold)] transition-colors"
+            >
+              <Printer className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Abrir / Imprimir
+            </a>
+          </div>
+        </section>
+      )}
 
       {/* Timeline */}
       <section>

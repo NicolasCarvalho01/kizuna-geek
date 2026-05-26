@@ -244,7 +244,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* INVOICE (NF-e) */}
+      {/* INVOICE (NF-e) — só aparece quando a loja virar ME e Focus NFe estiver ativo */}
       {order.invoice && (
         <section className="rounded-[var(--radius-lg)] border border-[color:var(--color-border)] p-5 lg:p-6">
           <p className="eyebrow mb-3">Nota Fiscal Eletrônica</p>
@@ -274,6 +274,32 @@ export default async function OrderDetailPage({ params }: PageProps) {
           </div>
         </section>
       )}
+
+      {/* RECIBO DE VENDA (não-fiscal) — sempre disponível pra pedidos pagos */}
+      {!order.invoice &&
+        order.status !== "PENDING" &&
+        order.status !== "CANCELLED" && (
+          <section className="rounded-[var(--radius-lg)] border border-[color:var(--color-border)] p-5 lg:p-6">
+            <p className="eyebrow mb-3">
+              <FileText className="inline h-3 w-3 mr-1.5 -mt-px" strokeWidth={1.5} />
+              Recibo de venda
+            </p>
+            <p className="text-[var(--text-caption)] text-[color:var(--color-fg-soft)] mb-4 leading-[var(--leading-relaxed)]">
+              Documento não-fiscal comprovando sua compra. Salve em PDF pelo
+              menu do navegador.
+            </p>
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={`/api/recibo/${order.orderNumber}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Download className="h-3.5 w-3.5" strokeWidth={1.5} />
+                Abrir recibo
+              </a>
+            </Button>
+          </section>
+        )}
 
       {/* TOTALS */}
       <section className="rounded-[var(--radius-lg)] border border-[color:var(--color-border)] p-5 lg:p-6">

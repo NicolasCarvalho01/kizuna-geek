@@ -79,6 +79,17 @@ export function OrderShippedEmail({
           ver pedido
         </Link>
       </P>
+
+      <P muted>
+        Precisa de comprovante da compra?{" "}
+        <Link
+          href={`${APP_URL}/api/recibo/${orderNumber}`}
+          style={{ color: emailColors.gold }}
+        >
+          baixar recibo
+        </Link>
+        {" "}(documento não-fiscal, salvável em PDF pelo navegador).
+      </P>
     </EmailLayout>
   );
 }
