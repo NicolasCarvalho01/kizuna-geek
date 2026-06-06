@@ -7,7 +7,9 @@ import {
   ChevronDown,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
+  Wand2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,12 @@ import {
   createProduct,
   updateProduct,
 } from "@/server/actions/admin-product-actions";
+import { generateProductCopy } from "@/server/actions/ai-product-actions";
+import {
+  PRODUCT_TEMPLATES,
+  getTemplateById,
+  getTemplatesByGroup,
+} from "@/lib/product-templates";
 import { cn } from "@/lib/utils";
 import type { ProductType, ProductStatus, CategoryType } from "@prisma/client";
 
@@ -210,6 +218,112 @@ export function ProductForm({
     });
   }
 
+  // ===================================================================
+  // ATALHOS — templates por tipo + IA pra descrição
+  // ===================================================================
+
+  const [aiGenerating, startAiGeneration] = React.useTransition();
+  const [aiError, setAiError] = React.useState<string | null>(null);
+  const [appliedTemplate, setAppliedTemplate] = React.useState<string>("");
+
+  function applyTemplate(templateId: string) {
+    const tpl = getTemplateById(templateId);
+    if (!tpl) return;
+    setAppliedTemplate(templateId);
+    setError(null);
+
+    setValues((v) => {
+      // Mescla tags do template com as já selecionadas (sem duplicar)
+      // Tags sugeridas SÓ entram se já existem cadastradas — admin pode
+      // criar tags faltantes em /admin/tags depois.
+      const suggestedTagIds = (tpl.suggestedTags ?? [])
+        .map((slug) =>
+          tags.find((t) => t.name.toLowerCase() === slug.toLowerCase())?.id,
+        )
+        .filter((id): id is string => Boolean(id));
+      const mergedTagIds = Array.from(new Set([...v.tagIds, ...suggestedTagIds]));
+
+      // Aplica defaults da variante na primeira variante (mantém as outras)
+      const updatedVariants = v.variants.map((variant, idx) =>
+        idx === 0 && tpl.variantDefaults
+          ? {
+              ...variant,
+              figureManufacturer:
+                tpl.variantDefaults.figureManufacturer ??
+                variant.figureManufacturer,
+              figureScale:
+                tpl.variantDefaults.figureScale ?? variant.figureScale,
+              figureHasBox:
+                tpl.variantDefaults.figureHasBox ?? variant.figureHasBox,
+              figureBoxCondition:
+                tpl.variantDefaults.figureBoxCondition ?? variant.figureBoxCondition,
+              tcgLanguage:
+                tpl.variantDefaults.tcgLanguage ?? variant.tcgLanguage,
+              tcgCondition:
+                tpl.variantDefaults.tcgCondition ?? variant.tcgCondition,
+              tcgIsFoil:
+                tpl.variantDefaults.tcgIsFoil ?? variant.tcgIsFoil,
+            }
+          : variant,
+      );
+
+      return {
+        ...v,
+        productType: tpl.productType,
+        brand: tpl.brand ?? v.brand,
+        weight: tpl.weight,
+        dimensions: tpl.dimensions,
+        tagIds: mergedTagIds,
+        variants: updatedVariants,
+      };
+    });
+  }
+
+  async function generateAiCopy() {
+    if (!values.name.trim()) {
+      setAiError("Informe o nome do produto antes de gerar.");
+      return;
+    }
+    setAiError(null);
+
+    const categoryName = categories.find((c) => c.id === values.categoryId)?.name;
+
+    startAiGeneration(async () => {
+      const res = await generateProductCopy({
+        name: values.name,
+        brand: values.brand || undefined,
+        franchise: values.franchise || undefined,
+        productType: values.productType,
+        category: categoryName,
+      });
+
+      if (!res.ok || !res.data) {
+        setAiError(res.error ?? "Erro ao gerar copy.");
+        return;
+      }
+
+      // Sobrescreve sempre — usuário pediu pra gerar
+      setValues((v) => ({
+        ...v,
+        shortDescription: res.data!.shortDescription,
+        description: res.data!.description,
+        metaTitle: res.data!.metaTitle || v.metaTitle,
+        metaDescription: res.data!.metaDescription || v.metaDescription,
+        // Tags: adiciona as sugeridas se existirem cadastradas
+        tagIds: Array.from(
+          new Set([
+            ...v.tagIds,
+            ...res.data!.tags
+              .map((slug) =>
+                tags.find((t) => t.name.toLowerCase() === slug.toLowerCase())?.id,
+              )
+              .filter((id): id is string => Boolean(id)),
+          ]),
+        ),
+      }));
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -281,6 +395,101 @@ export function ProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Atalhos — templates + IA */}
+      {mode === "create" && (
+        <section className="rounded-[var(--radius-lg)] border border-[color:var(--color-gold)]/30 bg-[color:var(--color-gold)]/5 p-5 lg:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles
+              className="h-4 w-4 text-[color:var(--color-gold)]"
+              strokeWidth={1.5}
+            />
+            <h3 className="font-[var(--font-display)] text-[1.0625rem] text-[color:var(--color-fg)]">
+              Atalhos pra acelerar
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Template */}
+            <div>
+              <label className="eyebrow mb-2 block">
+                1 · Aplicar template
+              </label>
+              <select
+                value={appliedTemplate}
+                onChange={(e) => {
+                  if (e.target.value) applyTemplate(e.target.value);
+                }}
+                className="w-full px-4 py-2.5 rounded-[var(--radius-sm)] border border-[color:var(--color-border-strong)] bg-transparent text-[0.875rem] focus:outline-none focus:border-[color:var(--color-gold)]"
+              >
+                <option value="">
+                  Selecione um tipo de produto…
+                </option>
+                {getTemplatesByGroup().map(([group, items]) => (
+                  <optgroup key={group} label={group}>
+                    {items.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p className="mt-2 text-[0.75rem] text-[color:var(--color-fg-soft)] leading-snug">
+                Pré-preenche tipo, marca, peso, dimensões e tags sugeridas.
+                Você ajusta o que for diferente.
+              </p>
+            </div>
+
+            {/* IA */}
+            <div>
+              <label className="eyebrow mb-2 block">
+                2 · Gerar descrição com IA
+              </label>
+              <Button
+                type="button"
+                onClick={generateAiCopy}
+                disabled={aiGenerating || !values.name.trim()}
+                variant="outline"
+                className="w-full"
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+                    Gerando…
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="h-4 w-4" strokeWidth={1.5} />
+                    Gerar copy completa
+                  </>
+                )}
+              </Button>
+              <p className="mt-2 text-[0.75rem] text-[color:var(--color-fg-soft)] leading-snug">
+                Preenche shortDescription, description, tags e meta SEO.
+                Precisa de nome (e idealmente franquia/marca) preenchidos.
+              </p>
+              {aiError && (
+                <p
+                  role="alert"
+                  className="mt-2 text-[var(--text-caption)] text-[color:var(--color-vermilion)]"
+                >
+                  {aiError}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {appliedTemplate && (
+            <p className="mt-4 inline-flex items-center gap-2 text-[0.8125rem] text-[color:var(--color-gold)]">
+              <Check className="h-3 w-3" strokeWidth={2} />
+              Template &ldquo;
+              {PRODUCT_TEMPLATES.find((t) => t.id === appliedTemplate)?.label}
+              &rdquo; aplicado
+            </p>
+          )}
+        </section>
+      )}
+
       {/* Identidade */}
       <Section title="Identidade">
         <FieldGrid>
