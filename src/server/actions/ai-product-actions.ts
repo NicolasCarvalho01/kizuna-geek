@@ -6,18 +6,21 @@ import type { ActionResult } from "@/server/actions/auth-actions";
 /**
  * AI helper pra gerar copy de produto (descrição, tags, SEO).
  *
- * Usa Anthropic Claude (claude-sonnet-4-5-20251022 ou similar) via API
- * REST direta — sem SDK pra ficar leve. Custa em torno de R$ 0,03–0,08
- * por produto dependendo do tamanho da resposta.
+ * Usa Google Gemini API (modelo Flash) via REST direta — sem SDK pra
+ * ficar leve. **GRATUITO** no free tier: 15 requests/min, 1500/dia.
+ * Suficiente pra cadastro normal de catálogo (~50-100 produtos/dia
+ * é tranquilo).
  *
- * Pra ativar: `ANTHROPIC_API_KEY` no Vercel + redeploy.
- * Pegar chave em: https://console.anthropic.com/settings/keys
+ * Pra ativar:
+ *  1. Cria conta em https://aistudio.google.com (Google, free)
+ *  2. Gera API key em https://aistudio.google.com/apikey
+ *  3. Adiciona `GEMINI_API_KEY` no Vercel + redeploy
  *
  * Sem a key configurada, retorna fallback genérico decente (sem AI).
  */
 
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"; // estável + barato
+const GEMINI_MODEL = "gemini-2.5-flash"; // free tier, rápido, qualidade boa
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export interface AiProductCopyInput {
   name: string;
@@ -58,7 +61,8 @@ export async function generateProductCopy(
   const guard = await assertAdmin();
   if (!guard.ok) return guard;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // Aceita GEMINI_API_KEY ou GOOGLE_API_KEY (Google usa os dois)
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     // Sem API key: retorna fallback decente (não bloqueia o admin)
     return {
@@ -70,31 +74,39 @@ export async function generateProductCopy(
   const prompt = buildPrompt(input);
 
   try {
-    const res = await fetch(ANTHROPIC_API_URL, {
+    const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 1200,
-        messages: [{ role: "user", content: prompt }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 1500,
+          // Força resposta em JSON estruturado — economiza parse manual
+          responseMimeType: "application/json",
+        },
       }),
     });
 
     if (!res.ok) {
       const errorBody = await res.text();
-      console.error("[ai-product] Anthropic error:", res.status, errorBody);
+      console.error("[ai-product] Gemini error:", res.status, errorBody);
       // Não falha o admin — devolve fallback
       return { ok: true, data: buildFallbackCopy(input) };
     }
 
     const json = (await res.json()) as {
-      content?: Array<{ type: string; text?: string }>;
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
     };
-    const text = json.content?.find((b) => b.type === "text")?.text ?? "";
+    const text =
+      json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
     const parsed = parseAiResponse(text);
     if (!parsed) {
